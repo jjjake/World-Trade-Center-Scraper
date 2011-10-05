@@ -2,6 +2,7 @@
 
 import urllib2
 import lxml.html
+from lxml import etree
 import re
 
 def openUrl(url):
@@ -40,11 +41,42 @@ def main():
         for collection in urlList(url,1):
             ### Item page iteration:
             for item in urlList(collection,2):
+                metaDict = {}
                 itemHTML = lxml.html.fromstring(openUrl(item).read())
                 for element in itemHTML.iter():
+                    if element.tag == 'p':
+                        try:
+                            if element.attrib['class'] == 'giDescription':
+                                description = element.text_content()
+                                metaDict['description'] = description
+                        except KeyError:
+                            pass
+                    if element.tag == 'div':
+                        try:
+                            if element.attrib['class'] == 'block-tags-ImageTags':
+                                subject = element.text_content()
+                                subject = subject.replace('\n', '')
+                                subject = subject.replace('Tags: ', '')
+                                subject = subject.split(',')
+                                subject = ';'.join(subject)
+                                metaDict['subject'] = subject
+                        except KeyError:
+                            pass
                     if element.tag == 'meta':
-                        print element.attrib
-
+                        attribDict = element.attrib
+                        if attribDict.get('name') == 'DC.creator':
+                            metaDict['creator'] = attribDict['content']
+                        if attribDict.get('name') == 'DC.date.created':
+                            metaDict['date'] = attribDict['content']
+                        if attribDict.get('name') == 'DC.date.reviewed':
+                            metaDict['date_reviewed'] = attribDict['content']
+                root = etree.Element("metadata")
+                for k,v in metaDict.iteritems():
+                    subElement = etree.SubElement(root, k)
+                    subElement.text = v
+                metaXml = etree.tostring(root, pretty_print=True,
+                                         xml_declaration=True, encoding="utf-8")
+                print '\n---\n%s\n' % metaXml
 
 if __name__ == '__main__':
     main()
